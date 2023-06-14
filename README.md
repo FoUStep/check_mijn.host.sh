@@ -14,6 +14,6 @@ A Nagios plugin based on Shell to check the expiry of a domain hosted at mijn.ho
 Usage:
 ./check_mijn.host.sh <domain> <apikey> (requires dateutils and curl)
 
-<domain>
-<apikey>
+<domain> = example.com
+<apikey> = long-string-given-by-support
 ```
