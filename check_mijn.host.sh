@@ -1,25 +1,18 @@
 #!/bin/bash
-# Nagios Check - 2023 MIJN.HOST API CHECK EXPIRY DOMAIN
-# 20230614 v1.0 - Step (debian 11.x tested)
+# Nagios Check - 2025 MIJN.HOST API CHECK EXPIRY DOMAIN(S)
+# 20250115 v2.0 - Step (debian 12.x tested)
 
 #
 # API key is required, ask support@mijn.host for an API key.
-# WARNING: SCRIPT NEEDS TO BE TESTED IF MULTIPLE DOMAINS!
 #
 
 # Main Vars
-OK=0
-WARNING=1
-CRITICAL=2
-ERROR=4
-
 crit=30
 warn=60
 
-domain=$1
-apikey=$2
+apikey=$1
 
-# Check for curl & dateutils
+# Check for curl & dateutils & apikey
 if ! [ -x "$(command -v curl)" ]; then
   echo 'Error: curl is not installed.' >&2
   exit $ERROR
@@ -30,32 +23,40 @@ if ! [ -x "$(command -v dateutils.ddiff)" ]; then
   exit $ERROR
 fi
 
-if [ -z "$domain" ] || [ -z "$apikey" ]
-# $domain is required but is not used except for display in output.
+if [ -z "$apikey" ]
 then
-        echo Usage: "$0 <domain> <apikey> (requires dateutils and curl)"
+        echo Usage: "$0 <apikey> (requires dateutils and curl)"
         exit $ERROR
 fi
 
-# Check date today
-today=$(date "+%Y-%m-%d")
+# Run complete check for all domain(s) expiry
+json_response=$(curl -s --location --request POST 'https://mijn.host/api/v1/domain/domains/' --header 'API-Key: '$apikey'' --header 'Content-Type: application/x-www-form-urlencoded' --header 'Accept: application/json');
 
-# Run complete check for domain expiry
-expiredate=$(curl -s --location --request POST 'https://mijn.host/api/v1/domain/domains/' --header 'API-Key: '$apikey'' --header 'Content-Type: application/x-www-form-urlencoded' --header 'Accept: application/json' | jq -r '.data."domains" | .[] | .renewal_date')
-remainingdays=$(( ($(date --date="$expiredate UTC" +%s) - $(date --date="$today UTC" +%s) )/(60*60*24) ))
-output=$(dateutils.ddiff -f '%Y years, %m months, %d days' today "$(dateutils.dadd now $remainingdays)")
+today=$(date +%Y-%m-%d)
 
-if [ "$remainingdays" -lt "$crit" ]; 
-	then
-		echo "CRITICAL - Renew domain $1. It expires in: $output | Remaining(Days)=$remainingdays"
-		exit $CRITICAL
-	else 
-		if [ "$remainingdays" -lt "$warn" ];
-			then 
-				echo "WARNING - Renew domain $1. It expires in: $output | Remaining(Days)=$remainingdays"
-				exit $WARNING
-			else
-				echo "DOMAIN OK - Domain $1 expires in: $output | Remaining(Days)=$remainingdays"
-				exit $OK
-		fi
+output=""
+all_domains=""
+exit_code=0  # Default exit code for "DOMAINS OK"
+
+# Process JSON and store results in variables
+while read -r domain expiredate; do
+  remainingdays=$(( ($(date --date="$expiredate UTC" +%s) - $(date --date="$today UTC" +%s)) / (60*60*24) ))
+  all_domains+="$domain ($remainingdays days) "
+  if [ "$remainingdays" -lt $crit ]; then
+    output+="CRITICAL: renewal for $domain ($remainingdays days) "
+    exit_code=2
+  elif [ "$remainingdays" -lt $warn ] && [ "$exit_code" -ne 2 ]; then
+    output+="WARNING: renewal for $domain ($remainingdays days) "
+    exit_code=1
+  fi
+done < <(echo "$json_response" | jq -r '.data.domains[] | "\(.domain) \(.renewal_date)"')
+
+# Display results
+if [ -n "$output" ]; then
+  echo "$output"
+else
+  echo "DOMAIN(S) OK: $all_domains"
 fi
+
+# Exit with the appropriate code
+exit $exit_code
