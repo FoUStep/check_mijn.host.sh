@@ -1,10 +1,10 @@
 # check_mijn.host.sh
 A Nagios plugin based on Shell to check the expiry of domain(s) hosted at mijn.host.
 
-| @15th January 2025 | Version |
+| @27th January 2025 | Version |
 |---------------:|----------|
 | Tested on      |  Debian 12 |
-| Nagios Core    |  4.4.14 |
+| Nagios Core    |  4.5.9 |
 
 [![GitHub release](https://img.shields.io/github/release/FoUStep/check_mijn.host.sh.svg)](https://GitHub.com/FoUStep/check_mijn.host.sh/releases/)
 
